@@ -2,124 +2,229 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Evaluación Arquitectura de Datos - Parte Final</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ETL & APIs - Dashboard de Datos</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    
     <style>
-        body { font-family: Arial, sans-serif; padding: 20px; background-color: #f4f4f9; }
-        .seccion { background: white; margin-bottom: 30px; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        #mapa { height: 500px; width: 100%; margin-top: 20px; border-radius: 8px; z-index: 1;}
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
+        }
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: var(--bg-color); 
+            color: var(--text-main); 
+            margin: 0; 
+            padding: 20px; 
+        }
+        .container { max-width: 1200px; margin: auto; }
+        
+        .header { text-align: center; margin-bottom: 40px; }
+        .header h1 { font-weight: 800; color: var(--primary); margin-bottom: 5px;}
+        .header p { color: var(--text-muted); margin-top: 0; }
+
+        .card { 
+            background: var(--card-bg); 
+            border-radius: 12px; 
+            padding: 25px; 
+            margin-bottom: 30px; 
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); 
+            border: 1px solid var(--border-color);
+        }
+        h3 { margin-top: 0; border-bottom: 2px solid var(--bg-color); padding-bottom: 10px; }
+
+        /* Botones e Inputs */
+        input[type="file"] { padding: 10px; border: 1px dashed var(--primary); border-radius: 8px; width: 100%; box-sizing: border-box; margin-bottom: 15px;}
+        button { 
+            background-color: var(--primary); color: white; border: none; 
+            padding: 10px 20px; border-radius: 6px; font-weight: 600; 
+            cursor: pointer; transition: background 0.2s;
+        }
+        button:hover { background-color: var(--primary-hover); }
+        .btn-descarga { background-color: #10b981; margin-top: 15px; width: 100%; }
+        .btn-descarga:hover { background-color: #059669; }
+
+        /* Tablas modernas */
         table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 14px; }
-        th, td { padding: 8px; border: 1px solid #ddd; text-align: left; }
-        th { background-color: #f0f0f0; }
-        .lista-scroll { max-height: 250px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; border-radius: 5px; }
+        th, td { padding: 12px; border-bottom: 1px solid var(--border-color); text-align: left; }
+        th { background-color: var(--bg-color); font-weight: 600; color: var(--text-muted); text-transform: uppercase; font-size: 12px;}
+
+        /* Grid para Famosos */
+        .layout-famosos { display: flex; gap: 20px; flex-wrap: wrap; }
+        .col-lista { flex: 1; min-width: 300px; max-height: 400px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; }
+        .col-imagen { flex: 1; min-width: 300px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--bg-color); border-radius: 8px; border: 1px dashed #cbd5e1; padding: 20px; text-align: center;}
+        
+        .famoso-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #f1f5f9; }
+        .famoso-item:last-child { border-bottom: none; }
+        .btn-small { padding: 5px 10px; font-size: 12px; }
+        
+        /* Mapa */
+        #mapa { height: 500px; width: 100%; border-radius: 12px; z-index: 1; border: 1px solid var(--border-color);}
+        
+        .alerta-error { color: #dc2626; background: #fef2f2; padding: 10px; border-radius: 6px; border: 1px solid #f87171; display: none; margin-bottom: 15px;}
     </style>
 </head>
 <body>
-    <h1>Arquitectura y Almacenamiento de Datos - Evaluación 2</h1>
-    
-    <div class="seccion">
-        <h3>I. Transformación y Almacenamiento de Comunas</h3>
-        <input type="file" id="archivoComunas" accept=".csv, .txt">
-        <button onclick="subirArchivo()">Procesar Archivo Completo</button>
-        <p><strong>Estado:</strong> <span id="estadoArchivo">Esperando archivo...</span></p>
-
-        <h4>Base de Datos Consolidada</h4>
-        <table>
-            <thead><tr><th>Comuna</th><th>Región</th><th>Habitantes</th></tr></thead>
-            <tbody id="tablaFinal"></tbody>
-        </table>
-
-        <h4>Log de Auditoría</h4>
-        <table>
-            <thead>
-                <tr>
-                    <th>Fecha y Hora</th><th>Leídos</th><th>Procesados</th>
-                    <th>Dupl. Eliminados</th><th>Consolidados</th><th>No Encontrados</th><th>Errores</th>
-                </tr>
-            </thead>
-            <tbody id="tablaAuditoria"></tbody>
-        </table>
-    </div>
-
-    <div class="seccion">
-        <h3>II. API de Famosos (Cargados desde DATOS2026-2.txt)</h3>
-        <p>Se procesó el archivo, se eliminaron duplicados y se calculó la edad.</p>
-        <div class="lista-scroll" id="listaFamosos">
-            <i>Cargando lista de famosos...</i>
+    <div class="container">
+        <div class="header">
+            <h1>Arquitectura y Almacenamiento de Datos</h1>
+            <p>Dashboard Consolidado - Evaluación 2</p>
         </div>
-        <div id="resultadoFamoso" style="margin-top: 20px; background: #fafafa; padding: 15px; border-radius: 8px; border: 1px solid #eee;">
-            <p>Seleccione un famoso de la lista para ver su imagen.</p>
-        </div>
-    </div>
 
-    <div class="seccion">
-        <h3>III. Mapa de Lugares Históricos (Cargados desde DATOS2026-3.TXT)</h3>
-        <div id="mapa"></div>
+        <div class="card">
+            <h3>I. Transformación y Almacenamiento de Comunas</h3>
+            <p style="font-size: 14px; color: var(--text-muted);">Cargue un archivo CSV o TXT para normalizar y auditar los datos geográficos.</p>
+            
+            <input type="file" id="archivoComunas" accept=".csv, .txt">
+            <button onclick="subirArchivo()">Procesar Archivo Masivo</button>
+            <p><strong>Estado:</strong> <span id="estadoArchivo" style="color: var(--primary);">Esperando archivo...</span></p>
+
+            <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-top: 20px;">
+                <div style="flex: 1; min-width: 300px;">
+                    <h4 style="margin-bottom: 5px;">Auditoría de Ejecución</h4>
+                    <table>
+                        <thead>
+                            <tr><th>Fecha/Hora</th><th>Leídos</th><th>Procesados</th><th>Duplicados</th><th>Consolidados</th></tr>
+                        </thead>
+                        <tbody id="tablaAuditoria"></tbody>
+                    </table>
+                </div>
+                <div style="flex: 1; min-width: 300px;">
+                    <h4 style="margin-bottom: 5px;">Tabla Final (Muestra)</h4>
+                    <div style="max-height: 200px; overflow-y: auto;">
+                        <table>
+                            <thead><tr><th>Comuna Normalizada</th><th>Región</th><th>Habitantes</th></tr></thead>
+                            <tbody id="tablaFinal"></tbody>
+                        </table>
+                    </div>
+                    <button class="btn-descarga" onclick="descargarDatos()">
+                        ⬇️ Descargar Datos Limpios (CSV)
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>II. API de Famosos y Edad Dinámica</h3>
+            <div class="layout-famosos">
+                <div class="col-lista" id="listaFamosos">
+                    <i style="color: var(--text-muted);">Cargando catálogo desde el servidor...</i>
+                </div>
+                <div class="col-imagen" id="resultadoFamoso">
+                    <p style="color: var(--text-muted);">Seleccione un famoso de la lista<br>para visualizar su ficha y fotografía.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>III. Georreferenciación de Lugares Históricos</h3>
+            <div id="errorMapa" class="alerta-error"></div>
+            <div id="mapa"></div>
+        </div>
     </div>
 
     <script>
         // --- PARTE I: Comunas ---
         async function subirArchivo() {
             const inputArchivo = document.getElementById('archivoComunas');
-            if (inputArchivo.files.length === 0) return alert("Seleccione un archivo.");
+            if (inputArchivo.files.length === 0) return alert("Seleccione un archivo primero.");
             
             document.getElementById('estadoArchivo').innerText = "Procesando...";
             const formData = new FormData();
             formData.append("archivo", inputArchivo.files[0]);
 
-            const res = await fetch('/api/procesar_archivo', { method: 'POST', body: formData });
-            const data = await res.json();
-            document.getElementById('estadoArchivo').innerText = data.mensaje || data.error;
-            actualizarTableros();
+            try {
+                const res = await fetch('/api/procesar_archivo', { method: 'POST', body: formData });
+                const data = await res.json();
+                document.getElementById('estadoArchivo').innerText = data.mensaje || data.error;
+                actualizarTableros();
+            } catch(e) {
+                document.getElementById('estadoArchivo').innerText = "Error de conexión.";
+            }
         }
 
         async function actualizarTableros() {
-            const res = await fetch('/api/auditoria');
-            const data = await res.json();
-            
-            let htmlTabla = '';
-            for (const [comuna, info] of Object.entries(data.tabla)) {
-                htmlTabla += `<tr><td>${comuna}</td><td>${info.region}</td><td>${info.habitantes}</td></tr>`;
-            }
-            document.getElementById('tablaFinal').innerHTML = htmlTabla;
+            try {
+                const res = await fetch('/api/auditoria');
+                const data = await res.json();
+                
+                let htmlTabla = '';
+                for (const [comuna, info] of Object.entries(data.tabla)) {
+                    htmlTabla += `<tr><td><strong>${comuna}</strong></td><td>${info.region}</td><td>${info.habitantes}</td></tr>`;
+                }
+                document.getElementById('tablaFinal').innerHTML = htmlTabla;
 
-            const log = data.log;
-            document.getElementById('tablaAuditoria').innerHTML = `
-                <tr>
-                    <td>${log.fecha_ejecucion}</td><td>${log.leidos}</td><td>${log.procesados}</td>
-                    <td>${log.duplicados_eliminados}</td><td>${log.consolidados}</td>
-                    <td>${log.no_encontrados}</td><td>${log.errores}</td>
-                </tr>
-            `;
+                const log = data.log;
+                document.getElementById('tablaAuditoria').innerHTML = `
+                    <tr>
+                        <td>${log.fecha_ejecucion || '-'}</td><td>${log.leidos}</td><td>${log.procesados}</td>
+                        <td style="color:red;">${log.duplicados_eliminados}</td><td style="color:green;">${log.consolidados}</td>
+                    </tr>
+                `;
+            } catch(e) {
+                console.error("No se pudo actualizar auditoría", e);
+            }
+        }
+
+        // Función nueva para disparar la descarga del CSV
+        function descargarDatos() {
+            window.location.href = '/api/descargar_comunas';
         }
 
         // --- PARTE II: Famosos ---
         async function cargarListaFamosos() {
-            const res = await fetch('/api/lista_famosos');
-            const famosos = await res.json();
-            
-            let html = "<ul>";
-            famosos.forEach(f => {
-                html += `<li>${f.nombre}, Edad aprox: ${f.edad} años - <button onclick="verFamoso('${f.nombre}')">Ver imagen</button></li>`;
-            });
-            html += "</ul>";
-            document.getElementById('listaFamosos').innerHTML = html;
+            try {
+                const res = await fetch('/api/lista_famosos');
+                const famosos = await res.json();
+                
+                if (famosos.error) {
+                    document.getElementById('listaFamosos').innerHTML = `<p style="color:red;">Error cargando archivo: ${famosos.error}</p>`;
+                    return;
+                }
+
+                let html = "";
+                famosos.forEach(f => {
+                    html += `
+                    <div class="famoso-item">
+                        <div><strong>${f.nombre}</strong><br><small style="color:#64748b;">Edad aprox: ${f.edad} años</small></div>
+                        <button class="btn-small" onclick="verFamoso('${f.nombre}')">Ver Imagen</button>
+                    </div>`;
+                });
+                document.getElementById('listaFamosos').innerHTML = html;
+            } catch(e) {
+                document.getElementById('listaFamosos').innerHTML = `<p style="color:red;">No se pudo conectar con el servidor.</p>`;
+            }
         }
 
         async function verFamoso(nombre) {
-            document.getElementById('resultadoFamoso').innerHTML = "<i>Buscando en Wikipedia...</i>";
-            const res = await fetch(`/api/famosos?nombre=${nombre}`);
-            const data = await res.json();
+            const contenedor = document.getElementById('resultadoFamoso');
+            contenedor.innerHTML = "<p><i>Consultando API de Wikipedia...</i></p>";
             
-            if(data.imagen) {
-                document.getElementById('resultadoFamoso').innerHTML = `
-                    <h4 style="margin-top:0;">${data.nombre}</h4>
-                    <img src="${data.imagen}" alt="${data.nombre}" style="max-height: 200px; border-radius: 8px;">
-                    <p><small><b>Fuente:</b> ${data.fuente} | <b>Captura:</b> ${data.fecha_captura}</small></p>
-                `;
-            } else {
-                document.getElementById('resultadoFamoso').innerHTML = `<p style="color:red;">Error: ${data.error}</p>`;
+            try {
+                const res = await fetch(`/api/famosos?nombre=${nombre}`);
+                const data = await res.json();
+                
+                if(data.imagen) {
+                    contenedor.innerHTML = `
+                        <h4 style="margin:0 0 15px 0;">${data.nombre}</h4>
+                        <img src="${data.imagen}" alt="${data.nombre}" style="max-height: 220px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                        <p style="margin-top:15px; font-size:12px; color:#64748b;">
+                            <b>Fuente:</b> ${data.fuente} | <b>Captura:</b> ${data.fecha_captura}
+                        </p>
+                    `;
+                } else {
+                    contenedor.innerHTML = `<p style="color:red;">${data.error}</p>`;
+                }
+            } catch(e) {
+                contenedor.innerHTML = `<p style="color:red;">Error al buscar imagen.</p>`;
             }
         }
 
@@ -127,14 +232,26 @@
         const map = L.map('mapa').setView([20, 0], 2);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
 
-        fetch('/api/lugares').then(res => res.json()).then(lugares => {
-            lugares.forEach(lugar => {
-                L.marker([lugar.lat, lugar.lng]).addTo(map)
-                 .bindPopup(`<b>${lugar.nombre}</b><br><small>${lugar.direccion}</small>`);
-            });
-        });
+        fetch('/api/lugares')
+            .then(res => res.json())
+            .then(data => {
+                if(data.error) {
+                    const errBox = document.getElementById('errorMapa');
+                    errBox.style.display = 'block';
+                    errBox.innerHTML = `<b>Error leyendo coordenadas:</b> ${data.error}`;
+                    return;
+                }
+                
+                if(Array.isArray(data)) {
+                    data.forEach(lugar => {
+                        L.marker([lugar.lat, lugar.lng]).addTo(map)
+                         .bindPopup(`<b>${lugar.nombre}</b><br><span style="font-size:11px;">${lugar.direccion}</span>`);
+                    });
+                }
+            })
+            .catch(err => console.error("Error en el mapa:", err));
 
-        // Inicializar vistas
+        // Inicialización
         actualizarTableros();
         cargarListaFamosos();
     </script>
