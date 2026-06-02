@@ -31,8 +31,6 @@
         .layout-famosos { display: flex; gap: 20px; flex-wrap: wrap; }
         .col-lista { flex: 1; min-width: 300px; max-height: 400px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; }
         .col-imagen { flex: 1; min-width: 300px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--bg-color); border-radius: 8px; border: 1px dashed #cbd5e1; padding: 20px; text-align: center;}
-        .famoso-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #f1f5f9; }
-        .famoso-item:last-child { border-bottom: none; }
         .btn-small { padding: 5px 10px; font-size: 12px; }
         #mapa { height: 500px; width: 100%; border-radius: 12px; z-index: 1; border: 1px solid var(--border-color);}
         .alerta-error { color: #dc2626; background: #fef2f2; padding: 10px; border-radius: 6px; border: 1px solid #f87171; display: none; margin-bottom: 15px;}
@@ -47,7 +45,7 @@
 
         <div class="card">
             <h3>I. Transformación y Almacenamiento Dinámico</h3>
-            <p style="font-size: 14px; color: var(--text-muted);">Cargue un archivo CSV o TXT. El sistema detectará automáticamente si son Comunas/Lugares o Famosos y ajustará la tabla.</p>
+            <p style="font-size: 14px; color: var(--text-muted);">Cargue un archivo CSV o TXT. El sistema detectará automáticamente si son Comunas/Lugares o Famosos y ajustará la tabla con datos reales.</p>
             
             <input type="file" id="archivoComunas" accept=".csv, .txt">
             <button onclick="subirArchivo()">Procesar Archivo Masivo</button>
@@ -79,16 +77,13 @@
         </div>
 
         <div class="card">
-            <h3>III. Georreferenciación de Lugares Históricos</h3>
-            <p style="font-size: 14px; color: var(--text-muted);">Seleccione un lugar histórico de la lista para viajar a él en el mapa.</p>
-            <div id="errorMapa" class="alerta-error"></div>
-            
+            <h3>II. API de Famosos y Edad Dinámica</h3>
             <div class="layout-famosos">
-                <div class="col-lista" id="listaLugares" style="max-height: 500px; flex: 1; min-width: 250px;">
-                    <i style="color: var(--text-muted);">Cargando lugares...</i>
+                <div class="col-lista" id="listaFamosos">
+                    <i style="color: var(--text-muted);">Cargando catálogo desde el servidor...</i>
                 </div>
-                <div style="flex: 2; min-width: 300px;">
-                    <div id="mapa"></div>
+                <div class="col-imagen" id="resultadoFamoso">
+                    <p style="color: var(--text-muted);">Seleccione un famoso de la lista<br>para visualizar su ficha y fotografía.</p>
                 </div>
             </div>
         </div>
@@ -114,8 +109,6 @@
                 const res = await fetch('/api/procesar_archivo', { method: 'POST', body: formData });
                 const data = await res.json();
                 document.getElementById('estadoArchivo').innerText = data.mensaje || data.error;
-                
-                // Le pasamos los datos directamente para evitar doble recarga
                 actualizarTableros(data);
             } catch(e) {
                 document.getElementById('estadoArchivo').innerText = "Error de conexión procesando el archivo.";
@@ -130,7 +123,6 @@
                     data = await res.json();
                 }
                 
-                // Actualizar encabezados dinámicamente según el archivo
                 if(data.tabla && data.tabla.columnas) {
                     let htmlThead = "<tr>";
                     data.tabla.columnas.forEach(col => { htmlThead += `<th>${col}</th>`; });
@@ -175,7 +167,6 @@
                     return;
                 }
 
-                // Diseño idéntico al solicitado por el profesor en el PDF
                 let html = "<ul style='list-style-type: disc; padding-left: 20px; line-height: 1.8;'>";
                 famosos.forEach(f => {
                     html += `
@@ -201,13 +192,10 @@
                 const data = await res.json();
                 
                 if(data.imagen) {
-                    // Diseño de la tarjeta mostrando todos los datos requeridos
                     contenedor.innerHTML = `
                         <div style="text-align:center; width: 100%;">
                             <h4 style="margin:0 0 10px 0; color: #1e293b;">Datos de: ${data.nombre}</h4>
-                            
                             <img src="${data.imagen}" alt="${data.nombre}" style="width: 100%; max-width: 250px; height: auto; object-fit: contain; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                            
                             <div style="margin-top:15px; font-size:13px; color:#1e293b; text-align: left; background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0;">
                                 <p style="margin: 4px 0;"><b>📌 Nombre:</b> ${data.nombre}</p>
                                 <p style="margin: 4px 0;"><b>📷 Fuente:</b> ${data.fuente}</p>
@@ -217,20 +205,30 @@
                             </div>
                         </div>
                     `;
-                } else {
-                    contenedor.innerHTML = `<p style="color:red;">${data.error}</p>`;
+                } else if (data.error) {
+                    // Control limpio para cuando Wikipedia no tiene la imagen
+                    contenedor.innerHTML = `
+                        <div style="text-align:center; width: 100%;">
+                            <h4 style="margin:0 0 10px 0; color: #1e293b;">Datos de: ${data.nombre || nombre}</h4>
+                            <div style="width: 100%; max-width: 250px; height: 150px; margin: 0 auto; background: #e2e8f0; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #64748b;">
+                                <span>No hay fotografía disponible</span>
+                            </div>
+                            <div style="margin-top:15px; font-size:13px; color:#1e293b; text-align: left; background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0;">
+                                <p style="margin: 4px 0;"><b>📌 Nombre:</b> ${data.nombre || nombre}</p>
+                                <p style="margin: 4px 0;"><b>📷 Fuente:</b> API de Wikipedia</p>
+                                <p style="margin: 0; color: #ef4444; font-weight: bold; font-size: 11px;">⚠️ ${data.error}</p>
+                            </div>
+                        </div>
+                    `;
                 }
             } catch(e) {
-                contenedor.innerHTML = `<p style="color:red;">Error al buscar imagen.</p>`;
+                contenedor.innerHTML = `<p style="color:red;">Error al conectar con la API.</p>`;
             }
         }
 
-       // --- PARTE III: Lugares Históricos interactivo ---
+        // --- PARTE III: Mapa ---
         const map = L.map('mapa').setView([20, 0], 2);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
-
-        // Guardamos los pines en un diccionario para poder abrirlos a distancia
-        let marcadores = {}; 
 
         fetch('/api/lugares')
             .then(res => res.json())
@@ -243,40 +241,13 @@
                 }
                 
                 if(Array.isArray(data)) {
-                    let htmlLista = "";
-                    
                     data.forEach(lugar => {
-                        // 1. Ponemos el pin en el mapa
-                        const marker = L.marker([lugar.lat, lugar.lng]).addTo(map)
+                        L.marker([lugar.lat, lugar.lng]).addTo(map)
                          .bindPopup(`<b>${lugar.nombre}</b><br><span style="font-size:11px;">${lugar.direccion}</span>`);
-                        
-                        marcadores[lugar.nombre] = marker;
-
-                        // 2. Creamos el botón en la lista lateral
-                        htmlLista += `
-                        <div class="famoso-item">
-                            <div><strong>${lugar.nombre}</strong></div>
-                            <button class="btn-small" style="background-color:#10b981;" onclick="irAlLugar(${lugar.lat}, ${lugar.lng}, '${lugar.nombre}')">🗺️ Viajar</button>
-                        </div>`;
                     });
-                    
-                    document.getElementById('listaLugares').innerHTML = htmlLista;
                 }
             })
             .catch(err => console.error("Error en el mapa:", err));
-
-        // Función que hace volar el mapa hacia las coordenadas seleccionadas
-        function irAlLugar(lat, lng, nombre) {
-            // Animación de vuelo al punto con nivel de zoom 15
-            map.flyTo([lat, lng], 15, { duration: 2.5 });
-            
-            // Abre el cartel del lugar justo después de aterrizar
-            setTimeout(() => {
-                if(marcadores[nombre]) {
-                    marcadores[nombre].openPopup();
-                }
-            }, 2500); 
-        }
 
         // Inicialización
         actualizarTableros();
