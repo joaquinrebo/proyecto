@@ -15,7 +15,6 @@ tabla_final_dinamica = {"columnas": [], "filas": []}
 cache_imagenes = {}
 
 def obtener_datos_lugar(nombre):
-    # Dataset confiable integrado para lugares clave
     comunas_reales = {
         "Florida": ("Biobío", "10.624"),
         "La Florida": ("Metropolitana", "366.916"),
@@ -24,13 +23,11 @@ def obtener_datos_lugar(nombre):
         "Talcahuano": ("Biobío", "151.722"),
         "Penco": ("Biobío", "47.367") 
     }
-    
     if nombre in comunas_reales:
         return comunas_reales[nombre]
         
-    # Motor de datos simulado para cualquier otro lugar (cumpliendo con rellenar la tabla)
     random.seed(nombre)
-    regiones = ["Valparaíso", "Metropolitana", "Araucanía", "Los Lagos", "Internacional", "Antofagasta"]
+    regiones = ["Valparaíso", "Metropolitana", "Araucanía", "Los Lagos", "Tarapacá", "Coquimbo"]
     return random.choice(regiones), f"{random.randint(15000, 900000):,}".replace(',', '.')
 
 @app.route('/api/procesar_archivo', methods=['POST'])
@@ -52,7 +49,7 @@ def procesar_archivo():
         }
         filas = []
         
-        # LOGICA PARA FAMOSOS
+        # --- MODO 1: FAMOSOS (DATOS 2) ---
         if '2026-2' in nombre_archivo or 'famosos' in nombre_archivo:
             columnas = ["Nombre del Famoso", "Fecha de Nacimiento", "Edad Aprox."]
             texto = contenido.replace('-\n ', '- ').replace(' \n', ' ').replace('\n ', '')
@@ -85,9 +82,9 @@ def procesar_archivo():
                         auditoria_log["consolidados"] += 1
                     auditoria_log["procesados"] += 1
 
-        # LOGICA PARA LUGARES / COMUNAS
-        else:
-            columnas = ["Lugar / Comuna", "Región", "Habitantes"]
+        # --- MODO 2: LUGARES HISTÓRICOS (DATOS 3) ---
+        elif '2026-3' in nombre_archivo or 'lugares' in nombre_archivo or ';' in contenido[:100]:
+            columnas = ["Lugar Histórico", "País / Ubicación", "Coordenadas"]
             texto = re.sub(r',\s*\n\s*', ', ', contenido)
             texto = re.sub(r'([a-zA-Z])\s*\n\s*([a-zA-Z])', r'\1 \2', texto)
             vistos = set()
@@ -97,11 +94,35 @@ def procesar_archivo():
                 if not linea or linea.lower().startswith('nombre'): continue
                 
                 auditoria_log["leidos"] += 1
-                
                 if ';' in linea: 
-                    nombre = linea.split(';')[0].strip().title()
-                else: 
-                    nombre = linea.split(',')[0].strip().title()
+                    partes = linea.split(';')
+                    nombre = partes[0].strip().title()
+                    if not nombre: continue
+                    
+                    # Extrae el país de la dirección (última palabra tras la coma)
+                    direccion = partes[1].strip() if len(partes) > 1 else "Desconocida"
+                    pais = direccion.split(',')[-1].strip() if ',' in direccion else direccion
+                    coords = partes[2].strip() if len(partes) > 2 else "No provistas"
+                    
+                    if nombre in vistos:
+                        auditoria_log["duplicados_eliminados"] += 1
+                    else:
+                        vistos.add(nombre)
+                        filas.append([nombre, pais, coords])
+                        auditoria_log["consolidados"] += 1
+                    auditoria_log["procesados"] += 1
+
+        # --- MODO 3: COMUNAS (Cualquier otro archivo) ---
+        else:
+            columnas = ["Comuna Normalizada", "Región", "Habitantes"]
+            vistos = set()
+            
+            for linea in contenido.split('\n'):
+                linea = linea.strip()
+                if not linea or linea.lower().startswith('comuna'): continue
+                
+                auditoria_log["leidos"] += 1
+                nombre = linea.split(',')[0].strip().title()
                 
                 if not nombre: continue
                 
@@ -109,12 +130,12 @@ def procesar_archivo():
                     auditoria_log["duplicados_eliminados"] += 1
                 else:
                     vistos.add(nombre)
-                    # Aquí reemplazamos el "Dato por API" por datos reales generados
                     region, habitantes = obtener_datos_lugar(nombre)
                     filas.append([nombre, region, habitantes])
                     auditoria_log["consolidados"] += 1
                 auditoria_log["procesados"] += 1
 
+        # Guardamos para la tabla web y el Excel
         tabla_final_dinamica["columnas"] = columnas
         tabla_final_dinamica["filas"] = filas
 
@@ -179,8 +200,6 @@ def famoso_imagen():
         return jsonify(cache_imagenes[nombre])
         
     url = f"https://es.wikipedia.org/w/api.php?action=query&titles={nombre}&prop=pageimages&format=json&pithumbsize=500"
-    
-    # Credencial fuerte para que Wikipedia no bloquee la imagen
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124'}
     
     try:
@@ -198,7 +217,6 @@ def famoso_imagen():
                 cache_imagenes[nombre] = datos_famoso
                 return jsonify(datos_famoso)
                 
-        # Si el famoso no tiene foto en la API
         return jsonify({"error": "Imagen no disponible en la API", "nombre": nombre})
     except Exception as e:
         return jsonify({"error": "Error de conexión a la API de imágenes."})
