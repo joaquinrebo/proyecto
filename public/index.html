@@ -10,65 +10,31 @@
     
     <style>
         :root {
-            --primary: #2563eb;
-            --primary-hover: #1d4ed8;
-            --bg-color: #f8fafc;
-            --card-bg: #ffffff;
-            --text-main: #1e293b;
-            --text-muted: #64748b;
-            --border-color: #e2e8f0;
+            --primary: #2563eb; --primary-hover: #1d4ed8; --bg-color: #f8fafc;
+            --card-bg: #ffffff; --text-main: #1e293b; --text-muted: #64748b; --border-color: #e2e8f0;
         }
-        body { 
-            font-family: 'Inter', sans-serif; 
-            background-color: var(--bg-color); 
-            color: var(--text-main); 
-            margin: 0; 
-            padding: 20px; 
-        }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); color: var(--text-main); margin: 0; padding: 20px; }
         .container { max-width: 1200px; margin: auto; }
-        
         .header { text-align: center; margin-bottom: 40px; }
         .header h1 { font-weight: 800; color: var(--primary); margin-bottom: 5px;}
         .header p { color: var(--text-muted); margin-top: 0; }
-
-        .card { 
-            background: var(--card-bg); 
-            border-radius: 12px; 
-            padding: 25px; 
-            margin-bottom: 30px; 
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); 
-            border: 1px solid var(--border-color);
-        }
+        .card { background: var(--card-bg); border-radius: 12px; padding: 25px; margin-bottom: 30px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid var(--border-color); }
         h3 { margin-top: 0; border-bottom: 2px solid var(--bg-color); padding-bottom: 10px; }
-
-        /* Botones e Inputs */
         input[type="file"] { padding: 10px; border: 1px dashed var(--primary); border-radius: 8px; width: 100%; box-sizing: border-box; margin-bottom: 15px;}
-        button { 
-            background-color: var(--primary); color: white; border: none; 
-            padding: 10px 20px; border-radius: 6px; font-weight: 600; 
-            cursor: pointer; transition: background 0.2s;
-        }
+        button { background-color: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
         button:hover { background-color: var(--primary-hover); }
         .btn-descarga { background-color: #10b981; margin-top: 15px; width: 100%; }
         .btn-descarga:hover { background-color: #059669; }
-
-        /* Tablas modernas */
         table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 14px; }
         th, td { padding: 12px; border-bottom: 1px solid var(--border-color); text-align: left; }
         th { background-color: var(--bg-color); font-weight: 600; color: var(--text-muted); text-transform: uppercase; font-size: 12px;}
-
-        /* Grid para Famosos */
         .layout-famosos { display: flex; gap: 20px; flex-wrap: wrap; }
         .col-lista { flex: 1; min-width: 300px; max-height: 400px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; }
         .col-imagen { flex: 1; min-width: 300px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--bg-color); border-radius: 8px; border: 1px dashed #cbd5e1; padding: 20px; text-align: center;}
-        
         .famoso-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #f1f5f9; }
         .famoso-item:last-child { border-bottom: none; }
         .btn-small { padding: 5px 10px; font-size: 12px; }
-        
-        /* Mapa */
         #mapa { height: 500px; width: 100%; border-radius: 12px; z-index: 1; border: 1px solid var(--border-color);}
-        
         .alerta-error { color: #dc2626; background: #fef2f2; padding: 10px; border-radius: 6px; border: 1px solid #f87171; display: none; margin-bottom: 15px;}
     </style>
 </head>
@@ -80,8 +46,8 @@
         </div>
 
         <div class="card">
-            <h3>I. Transformación y Almacenamiento de Comunas</h3>
-            <p style="font-size: 14px; color: var(--text-muted);">Cargue un archivo CSV o TXT para normalizar y auditar los datos geográficos.</p>
+            <h3>I. Transformación y Almacenamiento Dinámico</h3>
+            <p style="font-size: 14px; color: var(--text-muted);">Cargue un archivo CSV o TXT. El sistema detectará automáticamente si son Comunas/Lugares o Famosos y ajustará la tabla.</p>
             
             <input type="file" id="archivoComunas" accept=".csv, .txt">
             <button onclick="subirArchivo()">Procesar Archivo Masivo</button>
@@ -101,13 +67,13 @@
                     <h4 style="margin-bottom: 5px;">Tabla Final (Muestra)</h4>
                     <div style="max-height: 200px; overflow-y: auto;">
                         <table>
-                            <thead><tr><th>Comuna Normalizada</th><th>Región</th><th>Habitantes</th></tr></thead>
+                            <thead id="tablaFinalHead">
+                                <tr><th>Columna 1</th><th>Columna 2</th><th>Columna 3</th></tr>
+                            </thead>
                             <tbody id="tablaFinal"></tbody>
                         </table>
                     </div>
-                    <button class="btn-descarga" onclick="descargarDatos()">
-                        ⬇️ Descargar Datos Limpios (CSV)
-                    </button>
+                    <button class="btn-descarga" onclick="descargarDatos()">⬇️ Descargar Datos Limpios (CSV)</button>
                 </div>
             </div>
         </div>
@@ -132,7 +98,7 @@
     </div>
 
     <script>
-        // --- PARTE I: Comunas ---
+        // --- PARTE I: Procesador Inteligente ---
         async function subirArchivo() {
             const inputArchivo = document.getElementById('archivoComunas');
             if (inputArchivo.files.length === 0) return alert("Seleccione un archivo primero.");
@@ -145,22 +111,39 @@
                 const res = await fetch('/api/procesar_archivo', { method: 'POST', body: formData });
                 const data = await res.json();
                 document.getElementById('estadoArchivo').innerText = data.mensaje || data.error;
-                actualizarTableros();
+                
+                // Le pasamos los datos directamente para evitar doble recarga
+                actualizarTableros(data);
             } catch(e) {
-                document.getElementById('estadoArchivo').innerText = "Error de conexión.";
+                document.getElementById('estadoArchivo').innerText = "Error de conexión procesando el archivo.";
             }
         }
 
-        async function actualizarTableros() {
+        async function actualizarTableros(dataRespuesta = null) {
             try {
-                const res = await fetch('/api/auditoria');
-                const data = await res.json();
-                
-                let htmlTabla = '';
-                for (const [comuna, info] of Object.entries(data.tabla)) {
-                    htmlTabla += `<tr><td><strong>${comuna}</strong></td><td>${info.region}</td><td>${info.habitantes}</td></tr>`;
+                let data = dataRespuesta;
+                if(!data) {
+                    const res = await fetch('/api/auditoria');
+                    data = await res.json();
                 }
-                document.getElementById('tablaFinal').innerHTML = htmlTabla;
+                
+                // Actualizar encabezados dinámicamente según el archivo
+                if(data.tabla && data.tabla.columnas) {
+                    let htmlThead = "<tr>";
+                    data.tabla.columnas.forEach(col => { htmlThead += `<th>${col}</th>`; });
+                    htmlThead += "</tr>";
+                    document.getElementById('tablaFinalHead').innerHTML = htmlThead;
+                    
+                    let htmlTbody = '';
+                    data.tabla.filas.forEach(fila => {
+                        htmlTbody += "<tr>";
+                        fila.forEach((celda, index) => {
+                            htmlTbody += index === 0 ? `<td><strong>${celda}</strong></td>` : `<td>${celda}</td>`;
+                        });
+                        htmlTbody += "</tr>";
+                    });
+                    document.getElementById('tablaFinal').innerHTML = htmlTbody;
+                }
 
                 const log = data.log;
                 document.getElementById('tablaAuditoria').innerHTML = `
@@ -174,7 +157,6 @@
             }
         }
 
-        // Función nueva para disparar la descarga del CSV
         function descargarDatos() {
             window.location.href = '/api/descargar_comunas';
         }
@@ -228,9 +210,12 @@
             }
         }
 
-        // --- PARTE III: Lugares Históricos ---
+        // --- PARTE III: Lugares Históricos interactivo ---
         const map = L.map('mapa').setView([20, 0], 2);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
+
+        // Guardamos los pines en un diccionario para poder abrirlos a distancia
+        let marcadores = {}; 
 
         fetch('/api/lugares')
             .then(res => res.json())
@@ -243,13 +228,40 @@
                 }
                 
                 if(Array.isArray(data)) {
+                    let htmlLista = "";
+                    
                     data.forEach(lugar => {
-                        L.marker([lugar.lat, lugar.lng]).addTo(map)
+                        // 1. Ponemos el pin en el mapa
+                        const marker = L.marker([lugar.lat, lugar.lng]).addTo(map)
                          .bindPopup(`<b>${lugar.nombre}</b><br><span style="font-size:11px;">${lugar.direccion}</span>`);
+                        
+                        marcadores[lugar.nombre] = marker;
+
+                        // 2. Creamos el botón en la lista lateral
+                        htmlLista += `
+                        <div class="famoso-item">
+                            <div><strong>${lugar.nombre}</strong></div>
+                            <button class="btn-small" style="background-color:#10b981;" onclick="irAlLugar(${lugar.lat}, ${lugar.lng}, '${lugar.nombre}')">🗺️ Viajar</button>
+                        </div>`;
                     });
+                    
+                    document.getElementById('listaLugares').innerHTML = htmlLista;
                 }
             })
             .catch(err => console.error("Error en el mapa:", err));
+
+        // Función que hace volar el mapa hacia las coordenadas seleccionadas
+        function irAlLugar(lat, lng, nombre) {
+            // Animación de vuelo al punto con nivel de zoom 15
+            map.flyTo([lat, lng], 15, { duration: 2.5 });
+            
+            // Abre el cartel del lugar justo después de aterrizar
+            setTimeout(() => {
+                if(marcadores[nombre]) {
+                    marcadores[nombre].openPopup();
+                }
+            }, 2500); 
+        }
 
         // Inicialización
         actualizarTableros();

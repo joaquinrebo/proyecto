@@ -8,63 +8,96 @@ from datetime import datetime
 
 app = Flask(__name__)
 
-# --- PARTE I: Comunas ---
+# --- Variables globales adaptables ---
 auditoria_log = {"fecha_ejecucion": "", "leidos": 0, "procesados": 0, "duplicados_eliminados": 0, "consolidados": 0, "no_encontrados": 0, "errores": 0}
-tabla_final = {}
+tabla_final_dinamica = {"columnas": ["Comuna Normalizada", "Región", "Habitantes"], "filas": []}
 
 @app.route('/api/procesar_archivo', methods=['POST'])
 def procesar_archivo():
-    global auditoria_log, tabla_final
+    global auditoria_log, tabla_final_dinamica
     if 'archivo' not in request.files: return jsonify({"error": "Sin archivo"})
     
     archivo = request.files['archivo']
-    auditoria_log["fecha_ejecucion"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    contenido = archivo.stream.read().decode('utf-8').splitlines()
+    nombre_archivo = archivo.filename.lower()
     
-    for linea in contenido:
-        comuna_limpia = linea.split(',')[0].strip().title()
-        if not comuna_limpia: continue
-        auditoria_log["leidos"] += 1
-        if comuna_limpia in tabla_final:
-            auditoria_log["duplicados_eliminados"] += 1
-        else:
-            tabla_final[comuna_limpia] = {"region": "Dato por API", "habitantes": "Dato por API"}
-            auditoria_log["consolidados"] += 1
-        auditoria_log["procesados"] += 1
+    # EL ARREGLO DEL ERROR: errors='replace' evita que caracteres raros rompan la app
+    contenido = archivo.stream.read().decode('utf-8', errors='replace')
+    
+    auditoria_log = {"fecha_ejecucion": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "leidos": 0, "procesados": 0, "duplicados_eliminados": 0, "consolidados": 0, "no_encontrados": 0, "errores": 0}
+    filas = []
+    
+    # EL ARREGLO DE COLUMNAS: Detectamos si es el archivo de Famosos
+    if '2' in nombre_archivo or 'famosos' in nombre_archivo or bool(re.search(r'\d+\.\s+[A-Za-z]', contenido[:50])):
+        columnas = ["Nombre del Famoso", "Fecha de Nacimiento", "Edad Aprox."]
+        texto = contenido.replace('-\n ', '- ').replace(' \n', ' ').replace('\n ', '')
+        vistos = set()
+        for linea in texto.split('\n'):
+            if not linea.strip(): continue
+            auditoria_log["leidos"] += 1
+            match = re.search(r'\d+\.\s+(.*?)\s+-\s+(.*)', linea)
+            if match:
+                nombre = match.group(1).strip()
+                fecha_str = match.group(2).strip()
+                edad = "Desconocida"
+                if "a.C." in fecha_str:
+                    ym = re.search(r'(\d+)\s*a\.C\.', fecha_str)
+                    if ym: edad = 2026 + int(ym.group(1))
+                else:
+                    ym = re.search(r'(\d{4})', fecha_str)
+                    if ym: edad = 2026 - int(ym.group(1))
+                
+                if nombre in vistos:
+                    auditoria_log["duplicados_eliminados"] += 1
+                else:
+                    vistos.add(nombre)
+                    filas.append([nombre, fecha_str, f"{edad} años"])
+                    auditoria_log["consolidados"] += 1
+                auditoria_log["procesados"] += 1
+    else:
+        # Formato Datos 3 (Lugares/Comunas)
+        columnas = ["Lugar / Comuna", "Región", "Habitantes"]
+        texto = re.sub(r',\s*\n\s*', ', ', contenido)
+        texto = re.sub(r'([a-zA-Z])\s*\n\s*([a-zA-Z])', r'\1 \2', texto)
+        vistos = set()
+        for linea in texto.split('\n'):
+            if not linea.strip() or linea.startswith('Nombre'): continue
+            auditoria_log["leidos"] += 1
+            
+            if ';' in linea: nombre = linea.split(';')[0].strip().title()
+            else: nombre = linea.split(',')[0].strip().title()
+            
+            if not nombre: continue
+            if nombre in vistos:
+                auditoria_log["duplicados_eliminados"] += 1
+            else:
+                vistos.add(nombre)
+                filas.append([nombre, "Dato por API", "Dato por API"])
+                auditoria_log["consolidados"] += 1
+            auditoria_log["procesados"] += 1
 
-    return jsonify({"mensaje": "Archivo de comunas procesado con éxito", "log": auditoria_log})
+    tabla_final_dinamica["columnas"] = columnas
+    tabla_final_dinamica["filas"] = filas
+
+    return jsonify({"mensaje": "Archivo procesado con éxito", "log": auditoria_log, "tabla": tabla_final_dinamica})
 
 @app.route('/api/auditoria', methods=['GET'])
 def obtener_auditoria():
-    return jsonify({"log": auditoria_log, "tabla": tabla_final})
+    return jsonify({"log": auditoria_log, "tabla": tabla_final_dinamica})
+
 @app.route('/api/descargar_comunas', methods=['GET'])
 def descargar_comunas():
-    global tabla_final
-    
-    # Crea un archivo en memoria para no romper las reglas de Vercel
+    global tabla_final_dinamica
     si = io.StringIO()
     writer = csv.writer(si)
-    
-    # Escribe los encabezados del archivo
-    writer.writerow(['Comuna Normalizada', 'Región', 'Habitantes'])
-    
-    # Escribe todas las filas procesadas
-    for comuna, info in tabla_final.items():
-        writer.writerow([comuna, info['region'], info['habitantes']])
-        
-    # Prepara la respuesta para que el navegador descargue el archivo
-    output = si.getvalue()
-    return Response(
-        output,
-        mimetype="text/csv",
-        headers={"Content-disposition": "attachment; filename=comunas_limpias_2026.csv"}
-    )
+    if tabla_final_dinamica["columnas"]:
+        writer.writerow(tabla_final_dinamica["columnas"])
+        for fila in tabla_final_dinamica["filas"]: writer.writerow(fila)
+    return Response(si.getvalue(), mimetype="text/csv", headers={"Content-disposition": "attachment; filename=datos_limpios.csv"})
 
-# --- PARTE II: Famosos ---
+# --- PARTE II: Famosos (Lectura automática para la vista web) ---
 @app.route('/api/lista_famosos', methods=['GET'])
 def obtener_lista_famosos():
     base_dir = os.path.dirname(__file__)
-    # Buscar el archivo sin importar si la extensión está en mayúscula o minúscula
     ruta = os.path.join(base_dir, 'DATOS2026-2.txt')
     if not os.path.exists(ruta): ruta = os.path.join(base_dir, 'DATOS2026-2.TXT')
     
@@ -110,7 +143,7 @@ def famoso_imagen():
     except Exception as e:
         return jsonify({"error": str(e)})
 
-# --- PARTE III: Lugares (Solucionado) ---
+# --- PARTE III: Lugares ---
 @app.route('/api/lugares', methods=['GET'])
 def lugares_historicos():
     base_dir = os.path.dirname(__file__)
@@ -121,9 +154,7 @@ def lugares_historicos():
     try:
         with open(ruta, 'r', encoding='utf-8') as f:
             texto = f.read()
-            # Reparar coordenadas rotas (ej: 40.4319, \n 116.5704)
             texto = re.sub(r',\s*\n\s*', ', ', texto)
-            # Reparar palabras cortadas (ej: Machu \n Picchu)
             texto = re.sub(r'([a-zA-Z])\s*\n\s*([a-zA-Z])', r'\1 \2', texto)
             
             lineas = texto.split('\n')
