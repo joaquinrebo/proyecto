@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Evaluación Arquitectura de Datos - Parte 3</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background-color: #f4f4f9; }
+        .seccion { background: white; margin-bottom: 30px; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        #mapa { height: 400px; width: 100%; margin-top: 20px; border-radius: 8px; z-index: 1;}
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 10px; border: 1px solid #ddd; text-align: left; }
+        th { background-color: #f0f0f0; }
+        .sugerencias { color: #0066cc; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+    <h1>Arquitectura y Almacenamiento de Datos - Evaluación 2</h1>
+    
+    <div class="seccion">
+        <h3>I. Transformación y Almacenamiento de Comunas</h3>
+        <p>Pruebe escribiendo "florida" o "penco".</p>
+        <input type="text" id="inputComuna" placeholder="Ingrese comuna...">
+        <button onclick="buscarComuna()">Procesar Comuna</button>
+        <p><strong>Resultado:</strong> <span id="resultadoComuna">Esperando consulta...</span></p>
+        <p class="sugerencias" id="sugerenciasComuna"></p>
+
+        <h4>Base de Datos Consolidada</h4>
+        <table>
+            <thead><tr><th>Comuna</th><th>Región</th><th>Habitantes</th></tr></thead>
+            <tbody id="tablaFinal"></tbody>
+        </table>
+
+        <h4>Log de Auditoría</h4>
+        <table>
+            <thead>
+                <tr>
+                    <th>Fecha y Hora</th><th>Leídos</th><th>Procesados</th>
+                    <th>Duplicados Eliminados</th><th>Consolidados</th><th>No Encontrados</th><th>Errores</th>
+                </tr>
+            </thead>
+            <tbody id="tablaAuditoria"></tbody>
+        </table>
+    </div>
+
+    <div class="seccion">
+        <h3>II. API de Famosos</h3>
+        <ul>
+            <li>Madonna, 60 años - <button onclick="verFamoso('Madonna')">Ver imagen</button></li>
+            <li>Pelé, 80 años - <button onclick="verFamoso('Pelé')">Ver imagen</button></li>
+            <li>Diego Maradona, 65 años - <button onclick="verFamoso('Diego Maradona')">Ver imagen</button></li>
+            <li>Julius Caesar, 2000 años - <button onclick="verFamoso('Julio César')">Ver imagen</button></li>
+        </ul>
+        <div id="resultadoFamoso" style="margin-top: 20px;"></div>
+    </div>
+
+    <div class="seccion">
+        <h3>III. Mapa de Lugares Históricos</h3>
+        <div id="mapa"></div>
+    </div>
+
+    <script>
+        async function buscarComuna() {
+            const nombre = document.getElementById('inputComuna').value;
+            const respuesta = await fetch(`/api/comunas?nombre=${nombre}`);
+            const data = await respuesta.json();
+            
+            if(data.error) {
+                document.getElementById('resultadoComuna').innerText = data.error;
+            } else if (data.mensaje) {
+                document.getElementById('resultadoComuna').innerText = data.mensaje;
+            } else {
+                document.getElementById('resultadoComuna').innerText = 
+                    `${data.comuna} | Región: ${data.region} | Habitantes: ${data.habitantes} | Estado: ${data.estado}`;
+                document.getElementById('sugerenciasComuna').innerText = 
+                    `Sugerencias procesadas: ${data.sugerencias.join(', ')}`;
+            }
+            actualizarTableros();
+        }
+
+        async function actualizarTableros() {
+            const respuesta = await fetch('/api/auditoria');
+            const data = await respuesta.json();
+            
+            // Llenar tabla consolidada
+            let htmlTabla = '';
+            for (const [comuna, info] of Object.entries(data.tabla)) {
+                htmlTabla += `<tr><td>${comuna}</td><td>${info.region}</td><td>${info.habitantes}</td></tr>`;
+            }
+            document.getElementById('tablaFinal').innerHTML = htmlTabla;
+
+            // Llenar log de auditoría
+            const log = data.log;
+            document.getElementById('tablaAuditoria').innerHTML = `
+                <tr>
+                    <td>${log.fecha_ejecucion}</td><td>${log.leidos}</td><td>${log.procesados}</td>
+                    <td>${log.duplicados_eliminados}</td><td>${log.consolidados}</td>
+                    <td>${log.no_encontrados}</td><td>${log.errores}</td>
+                </tr>
+            `;
+        }
+
+        async function verFamoso(nombre) {
+            document.getElementById('resultadoFamoso').innerHTML = "<i>Buscando...</i>";
+            const respuesta = await fetch(`/api/famosos?nombre=${nombre}`);
+            const data = await respuesta.json();
+            
+            if(data.imagen) {
+                document.getElementById('resultadoFamoso').innerHTML = `
+                    <h4>${data.nombre}</h4>
+                    <img src="${data.imagen}" alt="${data.nombre}" style="max-width: 300px; border-radius: 8px;">
+                    <p><small><b>Fuente:</b> ${data.fuente} | <b>Captura:</b> ${data.fecha_captura}</small></p>
+                `;
+            } else {
+                document.getElementById('resultadoFamoso').innerHTML = `<p style="color:red;">Error: ${data.error}</p>`;
+            }
+        }
+
+        // Cargar mapa
+        const map = L.map('mapa').setView([20, 0], 2);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
+
+        fetch('/api/lugares').then(res => res.json()).then(lugares => {
+            lugares.forEach(lugar => {
+                L.marker([lugar.lat, lugar.lng]).addTo(map).bindPopup(`<b>${lugar.nombre}</b>`);
+            });
+        });
+
+        // Carga inicial vacía de tableros
+        actualizarTableros();
+    </script>
+</body>
+</html>
