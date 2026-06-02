@@ -94,31 +94,40 @@ def descargar_comunas():
         for fila in tabla_final_dinamica["filas"]: writer.writerow(fila)
     return Response(si.getvalue(), mimetype="text/csv", headers={"Content-disposition": "attachment; filename=datos_limpios.csv"})
 
-# --- PARTE II: Famosos (Lectura automática para la vista web) ---
-@app.route('/api/lista_famosos', methods=['GET'])
-def obtener_lista_famosos():
-    base_dir = os.path.dirname(__file__)
-    ruta = os.path.join(base_dir, 'DATOS2026-2.txt')
-    if not os.path.exists(ruta): ruta = os.path.join(base_dir, 'DATOS2026-2.TXT')
+# --- PARTE II: Famosos ---
+# Creamos un diccionario en memoria para almacenar las consultas (Caché)
+cache_imagenes = {}
+
+@app.route('/api/famosos', methods=['GET'])
+def famoso_imagen():
+    nombre = request.args.get('nombre', '')
     
-    famosos_dict = {}
+    # 1. REQUISITO DEL PROFESOR: Verificar si ya lo consultamos antes (Caché)
+    if nombre in cache_imagenes:
+        return jsonify(cache_imagenes[nombre])
+        
+    # 2. Si no está en caché, consultamos a la API de Wikipedia
+    url = f"https://es.wikipedia.org/w/api.php?action=query&titles={nombre}&prop=pageimages&format=json&pithumbsize=500"
+    headers = {'User-Agent': 'ProyectoInacap2026/1.0'}
+    
     try:
-        with open(ruta, 'r', encoding='utf-8') as f:
-            contenido = f.read().replace('-\n ', '- ').replace(' \n', ' ').replace('\n ', '')
-            for linea in contenido.split('\n'):
-                match = re.search(r'\d+\.\s+(.*?)\s+-\s+(.*)', linea)
-                if match:
-                    nombre = match.group(1).strip()
-                    fecha_str = match.group(2).strip()
-                    edad = "Desconocida"
-                    if "a.C." in fecha_str:
-                        ym = re.search(r'(\d+)\s*a\.C\.', fecha_str)
-                        if ym: edad = 2026 + int(ym.group(1))
-                    else:
-                        ym = re.search(r'(\d{4})', fecha_str)
-                        if ym: edad = 2026 - int(ym.group(1))
-                    famosos_dict[nombre] = {"nombre": nombre, "edad": edad, "fecha": fecha_str}
-        return jsonify(list(famosos_dict.values()))
+        respuesta = requests.get(url, headers=headers).json()
+        paginas = respuesta.get('query', {}).get('pages', {})
+        for page_id, info in paginas.items():
+            if 'thumbnail' in info:
+                datos_famoso = {
+                    "nombre": nombre,
+                    "imagen": info['thumbnail']['source'],
+                    "fuente": "API de Wikipedia",
+                    "fecha_captura": "Dato no provisto por metadatos",
+                    "origen_dato": "Consultado desde la API"
+                }
+                # Guardamos la respuesta en el caché para la próxima vez
+                cache_imagenes[nombre] = datos_famoso
+                
+                return jsonify(datos_famoso)
+                
+        return jsonify({"error": "No se encontró imagen en Wikipedia"})
     except Exception as e:
         return jsonify({"error": str(e)})
 

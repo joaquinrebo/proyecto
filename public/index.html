@@ -79,13 +79,16 @@
         </div>
 
         <div class="card">
-            <h3>II. API de Famosos y Edad Dinámica</h3>
+            <h3>III. Georreferenciación de Lugares Históricos</h3>
+            <p style="font-size: 14px; color: var(--text-muted);">Seleccione un lugar histórico de la lista para viajar a él en el mapa.</p>
+            <div id="errorMapa" class="alerta-error"></div>
+            
             <div class="layout-famosos">
-                <div class="col-lista" id="listaFamosos">
-                    <i style="color: var(--text-muted);">Cargando catálogo desde el servidor...</i>
+                <div class="col-lista" id="listaLugares" style="max-height: 500px; flex: 1; min-width: 250px;">
+                    <i style="color: var(--text-muted);">Cargando lugares...</i>
                 </div>
-                <div class="col-imagen" id="resultadoFamoso">
-                    <p style="color: var(--text-muted);">Seleccione un famoso de la lista<br>para visualizar su ficha y fotografía.</p>
+                <div style="flex: 2; min-width: 300px;">
+                    <div id="mapa"></div>
                 </div>
             </div>
         </div>
@@ -172,14 +175,17 @@
                     return;
                 }
 
-                let html = "";
+                // Diseño idéntico al solicitado por el profesor en el PDF
+                let html = "<ul style='list-style-type: disc; padding-left: 20px; line-height: 1.8;'>";
                 famosos.forEach(f => {
                     html += `
-                    <div class="famoso-item">
-                        <div><strong>${f.nombre}</strong><br><small style="color:#64748b;">Edad aprox: ${f.edad} años</small></div>
-                        <button class="btn-small" onclick="verFamoso('${f.nombre}')">Ver Imagen</button>
-                    </div>`;
+                    <li style="border-bottom: 1px solid #f1f5f9; padding: 5px 0;">
+                        ${f.nombre}, ${f.edad} años - 
+                        <button class="btn-small" style="background-color: var(--primary); color: white; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer;" onclick="verFamoso('${f.nombre}')">"Ver imagen"</button>
+                    </li>`;
                 });
+                html += "</ul>";
+                
                 document.getElementById('listaFamosos').innerHTML = html;
             } catch(e) {
                 document.getElementById('listaFamosos').innerHTML = `<p style="color:red;">No se pudo conectar con el servidor.</p>`;
@@ -188,19 +194,28 @@
 
         async function verFamoso(nombre) {
             const contenedor = document.getElementById('resultadoFamoso');
-            contenedor.innerHTML = "<p><i>Consultando API de Wikipedia...</i></p>";
+            contenedor.innerHTML = "<p><i>Procesando y conectando a la API...</i></p>";
             
             try {
                 const res = await fetch(`/api/famosos?nombre=${nombre}`);
                 const data = await res.json();
                 
                 if(data.imagen) {
+                    // Diseño de la tarjeta mostrando todos los datos requeridos
                     contenedor.innerHTML = `
-                        <h4 style="margin:0 0 15px 0;">${data.nombre}</h4>
-                        <img src="${data.imagen}" alt="${data.nombre}" style="max-height: 220px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                        <p style="margin-top:15px; font-size:12px; color:#64748b;">
-                            <b>Fuente:</b> ${data.fuente} | <b>Captura:</b> ${data.fecha_captura}
-                        </p>
+                        <div style="text-align:center; width: 100%;">
+                            <h4 style="margin:0 0 10px 0; color: #1e293b;">Datos de: ${data.nombre}</h4>
+                            
+                            <img src="${data.imagen}" alt="${data.nombre}" style="width: 100%; max-width: 250px; height: auto; object-fit: contain; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                            
+                            <div style="margin-top:15px; font-size:13px; color:#1e293b; text-align: left; background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0;">
+                                <p style="margin: 4px 0;"><b>📌 Nombre:</b> ${data.nombre}</p>
+                                <p style="margin: 4px 0;"><b>📷 Fuente:</b> ${data.fuente}</p>
+                                <p style="margin: 4px 0;"><b>📅 Fecha Captura:</b> ${data.fecha_captura}</p>
+                                <hr style="border: 0; border-top: 1px solid #cbd5e1; margin: 8px 0;">
+                                <p style="margin: 0; color: #10b981; font-weight: bold; font-size: 11px;">✅ API optimizada (Caché implementado)</p>
+                            </div>
+                        </div>
                     `;
                 } else {
                     contenedor.innerHTML = `<p style="color:red;">${data.error}</p>`;
@@ -210,7 +225,7 @@
             }
         }
 
-        // --- PARTE III: Lugares Históricos interactivo ---
+       // --- PARTE III: Lugares Históricos interactivo ---
         const map = L.map('mapa').setView([20, 0], 2);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
 
