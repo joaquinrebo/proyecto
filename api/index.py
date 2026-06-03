@@ -3,7 +3,6 @@ import re
 import io
 import csv
 import random
-import difflib
 from flask import Flask, jsonify, request, Response
 import requests
 from datetime import datetime
@@ -30,16 +29,6 @@ def obtener_datos_lugar(nombre):
     random.seed(nombre)
     regiones = ["Valparaíso", "Metropolitana", "Araucanía", "Los Lagos", "Tarapacá", "Coquimbo"]
     return random.choice(regiones), f"{random.randint(15000, 900000):,}".replace(',', '.')
-
-
-    
-    # Regla específica solicitada en la rúbrica
-    if query == "florida":
-        return jsonify(["Florida", "La Florida"])
-        
-    # Sugerencia inteligente para otras comunas
-    matches = difflib.get_close_matches(query.title(), comunas_base, n=3, cutoff=0.4)
-    return jsonify(matches)
 
 @app.route('/api/procesar_archivo', methods=['POST'])
 def procesar_archivo():
@@ -92,8 +81,6 @@ def procesar_archivo():
                         filas.append([nombre, fecha_str, f"{edad} años"])
                         auditoria_log["consolidados"] += 1
                     auditoria_log["procesados"] += 1
-                else:
-                    auditoria_log["errores"] += 1
 
         # --- MODO 2: LUGARES HISTÓRICOS (DATOS 3) ---
         elif '2026-3' in nombre_archivo or 'lugares' in nombre_archivo or ';' in contenido[:100]:
@@ -110,10 +97,9 @@ def procesar_archivo():
                 if ';' in linea: 
                     partes = linea.split(';')
                     nombre = partes[0].strip().title()
-                    if not nombre: 
-                        auditoria_log["errores"] += 1
-                        continue
+                    if not nombre: continue
                     
+                    # Extrae el país de la dirección (última palabra tras la coma)
                     direccion = partes[1].strip() if len(partes) > 1 else "Desconocida"
                     pais = direccion.split(',')[-1].strip() if ',' in direccion else direccion
                     coords = partes[2].strip() if len(partes) > 2 else "No provistas"
@@ -125,10 +111,8 @@ def procesar_archivo():
                         filas.append([nombre, pais, coords])
                         auditoria_log["consolidados"] += 1
                     auditoria_log["procesados"] += 1
-                else:
-                    auditoria_log["errores"] += 1
 
-        # --- MODO 3: COMUNAS ---
+        # --- MODO 3: COMUNAS (Cualquier otro archivo) ---
         else:
             columnas = ["Comuna Normalizada", "Región", "Habitantes"]
             vistos = set()
@@ -140,25 +124,18 @@ def procesar_archivo():
                 auditoria_log["leidos"] += 1
                 nombre = linea.split(',')[0].strip().title()
                 
-                if not nombre: 
-                    auditoria_log["errores"] += 1
-                    continue
+                if not nombre: continue
                 
                 if nombre in vistos:
                     auditoria_log["duplicados_eliminados"] += 1
                 else:
                     vistos.add(nombre)
                     region, habitantes = obtener_datos_lugar(nombre)
-                    
-                    # Simulamos "No encontrados" para propósitos de la auditoría
-                    if region == "Desconocida":
-                        auditoria_log["no_encontrados"] += 1
-                    else:
-                        filas.append([nombre, region, habitantes])
-                        auditoria_log["consolidados"] += 1
-                        
+                    filas.append([nombre, region, habitantes])
+                    auditoria_log["consolidados"] += 1
                 auditoria_log["procesados"] += 1
 
+        # Guardamos para la tabla web y el Excel
         tabla_final_dinamica["columnas"] = columnas
         tabla_final_dinamica["filas"] = filas
 
@@ -218,24 +195,31 @@ def obtener_lista_famosos():
 @app.route('/api/famosos', methods=['GET'])
 def famoso_imagen():
     nombre = request.args.get('nombre', '')
+    
     if nombre in cache_imagenes:
         return jsonify(cache_imagenes[nombre])
         
     url = f"https://es.wikipedia.org/w/api.php?action=query&titles={nombre}&prop=pageimages&format=json&pithumbsize=500"
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124'}
     
     try:
         respuesta = requests.get(url, headers=headers).json()
         paginas = respuesta.get('query', {}).get('pages', {})
         for page_id, info in paginas.items():
             if 'thumbnail' in info:
-                datos_famoso = {"nombre": nombre, "imagen": info['thumbnail']['source'], "fuente": "API de Wikipedia", "fecha_captura": "Dato no provisto por metadatos", "origen_dato": "Consultado desde la API"}
+                datos_famoso = {
+                    "nombre": nombre,
+                    "imagen": info['thumbnail']['source'],
+                    "fuente": "API de Wikipedia",
+                    "fecha_captura": "Dato no provisto por metadatos",
+                    "origen_dato": "Consultado desde la API"
+                }
                 cache_imagenes[nombre] = datos_famoso
                 return jsonify(datos_famoso)
                 
         return jsonify({"error": "Imagen no disponible en la API", "nombre": nombre})
     except Exception as e:
-        return jsonify({"error": "Error de conexión a la API."})
+        return jsonify({"error": "Error de conexión a la API de imágenes."})
 
 @app.route('/api/lugares', methods=['GET'])
 def lugares_historicos():
