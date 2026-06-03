@@ -29,11 +29,13 @@
         th, td { padding: 12px; border-bottom: 1px solid var(--border-color); text-align: left; }
         th { background-color: var(--bg-color); font-weight: 600; color: var(--text-muted); text-transform: uppercase; font-size: 12px;}
         .layout-famosos { display: flex; gap: 20px; flex-wrap: wrap; }
-        .col-lista { flex: 1; min-width: 300px; max-height: 400px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; }
+        .col-lista { flex: 1; min-width: 300px; max-height: 400px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; background: #fafafa;}
         .col-imagen { flex: 1; min-width: 300px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--bg-color); border-radius: 8px; border: 1px dashed #cbd5e1; padding: 20px; text-align: center;}
+        .famoso-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #f1f5f9; background: white;}
+        .famoso-item:last-child { border-bottom: none; }
         .btn-small { padding: 5px 10px; font-size: 12px; }
         #mapa { height: 500px; width: 100%; border-radius: 12px; z-index: 1; border: 1px solid var(--border-color);}
-        .alerta-error { color: #dc2626; background: #fef2f2; padding: 10px; border-radius: 6px; border: 1px solid #f87171; display: none; margin-bottom: 15px;}
+        .alerta-info { color: #0369a1; background: #e0f2fe; padding: 15px; border-radius: 6px; border: 1px solid #7dd3fc; text-align: center; font-size: 14px;}
     </style>
 </head>
 <body>
@@ -80,7 +82,7 @@
             <h3>II. API de Famosos y Edad Dinámica</h3>
             <div class="layout-famosos">
                 <div class="col-lista" id="listaFamosos">
-                    <i style="color: var(--text-muted);">Cargando catálogo desde el servidor...</i>
+                    <div class="alerta-info">⏳ Procese el archivo de datos de famosos en la <b>Sección I</b> para habilitar este catálogo.</div>
                 </div>
                 <div class="col-imagen" id="resultadoFamoso">
                     <p style="color: var(--text-muted);">Seleccione un famoso de la lista<br>para visualizar su ficha y fotografía.</p>
@@ -90,12 +92,29 @@
 
         <div class="card">
             <h3>III. Georreferenciación de Lugares Históricos</h3>
-            <div id="errorMapa" class="alerta-error"></div>
-            <div id="mapa"></div>
+            <p style="font-size: 14px; color: var(--text-muted);">Seleccione un lugar histórico de la lista para viajar a él en el mapa.</p>
+            
+            <div class="layout-famosos">
+                <div class="col-lista" id="listaLugares" style="max-height: 500px; flex: 1; min-width: 250px;">
+                    <div class="alerta-info">⏳ Procese el archivo de lugares históricos en la <b>Sección I</b> para habilitar las coordenadas.</div>
+                </div>
+                <div style="flex: 2; min-width: 300px;">
+                    <div id="mapa"></div>
+                </div>
+            </div>
         </div>
     </div>
 
     <script>
+        // Capa global para limpiar el mapa fácilmente
+        let marcadoresCargados; 
+        let marcadores = {}; 
+
+        // Configuración inicial del Mapa (Arranca vacío)
+        const map = L.map('mapa').setView([20, 0], 2);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
+        marcadoresCargados = L.layerGroup().addTo(map);
+
         // --- PARTE I: Procesador Inteligente ---
         async function subirArchivo() {
             const inputArchivo = document.getElementById('archivoComunas');
@@ -109,46 +128,92 @@
                 const res = await fetch('/api/procesar_archivo', { method: 'POST', body: formData });
                 const data = await res.json();
                 document.getElementById('estadoArchivo').innerText = data.mensaje || data.error;
+                
+                // Enviamos los datos directamente a construir el dashboard
                 actualizarTableros(data);
             } catch(e) {
                 document.getElementById('estadoArchivo').innerText = "Error de conexión procesando el archivo.";
             }
         }
 
-        async function actualizarTableros(dataRespuesta = null) {
-            try {
-                let data = dataRespuesta;
-                if(!data) {
-                    const res = await fetch('/api/auditoria');
-                    data = await res.json();
-                }
+        function actualizarTableros(data) {
+            if(!data || !data.tabla) return;
+            
+            // 1. Llenar Tabla Principal y Auditoría
+            if(data.tabla.columnas) {
+                let htmlThead = "<tr>";
+                data.tabla.columnas.forEach(col => { htmlThead += `<th>${col}</th>`; });
+                htmlThead += "</tr>";
+                document.getElementById('tablaFinalHead').innerHTML = htmlThead;
                 
-                if(data.tabla && data.tabla.columnas) {
-                    let htmlThead = "<tr>";
-                    data.tabla.columnas.forEach(col => { htmlThead += `<th>${col}</th>`; });
-                    htmlThead += "</tr>";
-                    document.getElementById('tablaFinalHead').innerHTML = htmlThead;
-                    
-                    let htmlTbody = '';
-                    data.tabla.filas.forEach(fila => {
-                        htmlTbody += "<tr>";
-                        fila.forEach((celda, index) => {
-                            htmlTbody += index === 0 ? `<td><strong>${celda}</strong></td>` : `<td>${celda}</td>`;
-                        });
-                        htmlTbody += "</tr>";
+                let htmlTbody = '';
+                data.tabla.filas.forEach(fila => {
+                    htmlTbody += "<tr>";
+                    fila.forEach((celda, index) => {
+                        htmlTbody += index === 0 ? `<td><strong>${celda}</strong></td>` : `<td>${celda}</td>`;
                     });
-                    document.getElementById('tablaFinal').innerHTML = htmlTbody;
-                }
+                    htmlTbody += "</tr>";
+                });
+                document.getElementById('tablaFinal').innerHTML = htmlTbody;
+            }
 
-                const log = data.log;
-                document.getElementById('tablaAuditoria').innerHTML = `
-                    <tr>
-                        <td>${log.fecha_ejecucion || '-'}</td><td>${log.leidos}</td><td>${log.procesados}</td>
-                        <td style="color:red;">${log.duplicados_eliminados}</td><td style="color:green;">${log.consolidados}</td>
-                    </tr>
-                `;
-            } catch(e) {
-                console.error("No se pudo actualizar auditoría", e);
+            const log = data.log;
+            document.getElementById('tablaAuditoria').innerHTML = `
+                <tr>
+                    <td>${log.fecha_ejecucion || '-'}</td><td>${log.leidos}</td><td>${log.procesados}</td>
+                    <td style="color:red;">${log.duplicados_eliminados}</td><td style="color:green;">${log.consolidados}</td>
+                </tr>
+            `;
+
+            // 2. ACTIVACIÓN CONDICIONAL: Solo si procesó Famosos
+            if(data.tabla.columnas.includes("Edad Aprox.")) {
+                let htmlFamosos = "<ul style='list-style-type: disc; padding-left: 20px; line-height: 1.8; background: white; padding-right: 15px; border-radius: 6px;'>";
+                data.tabla.filas.forEach(fila => {
+                    htmlFamosos += `
+                    <li style="border-bottom: 1px solid #f1f5f9; padding: 5px 0;">
+                        ${fila[0]}, ${fila[2]} - 
+                        <button class="btn-small" style="background-color: var(--primary); color: white; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer;" onclick="verFamoso('${fila[0]}')">"Ver imagen"</button>
+                    </li>`;
+                });
+                htmlFamosos += "</ul>";
+                document.getElementById('listaFamosos').innerHTML = htmlFamosos;
+                document.getElementById('resultadoFamoso').innerHTML = "<p style='color: var(--text-muted);'>Seleccione un famoso de la lista<br>para visualizar su ficha y fotografía.</p>";
+            }
+
+            // 3. ACTIVACIÓN CONDICIONAL: Solo si procesó Lugares Históricos
+            if(data.tabla.columnas.includes("Coordenadas")) {
+                marcadoresCargados.clearLayers(); // Limpiamos pines viejos si sube otro archivo
+                marcadores = {}; 
+                let htmlLugares = "";
+
+                data.tabla.filas.forEach(fila => {
+                    let nombre = fila[0];
+                    let pais = fila[1];
+                    let coordsCrudas = fila[2];
+                    
+                    // Separamos el string de coordenadas "lat, lng" que viene de Python
+                    let arrCoords = coordsCrudas.split(',');
+                    if(arrCoords.length === 2) {
+                        let lat = parseFloat(arrCoords[0].trim());
+                        let lng = parseFloat(arrCoords[1].trim());
+
+                        if(!isNaN(lat) && !isNaN(lng)) {
+                            // Crear el pin en el mapa
+                            const marker = L.marker([lat, lng]).addTo(marcadoresCargados)
+                             .bindPopup(`<b>${nombre}</b><br><span style="font-size:11px;">${pais}</span>`);
+                            
+                            marcadores[nombre] = marker;
+
+                            // Crear el botón en la lista
+                            htmlLugares += `
+                            <div class="famoso-item">
+                                <div><strong>${nombre}</strong></div>
+                                <button class="btn-small" style="background-color:#10b981;" onclick="irAlLugar(${lat}, ${lng}, '${nombre}')">🗺️ Viajar</button>
+                            </div>`;
+                        }
+                    }
+                });
+                document.getElementById('listaLugares').innerHTML = htmlLugares;
             }
         }
 
@@ -156,33 +221,7 @@
             window.location.href = '/api/descargar_comunas';
         }
 
-        // --- PARTE II: Famosos ---
-        async function cargarListaFamosos() {
-            try {
-                const res = await fetch('/api/lista_famosos');
-                const famosos = await res.json();
-                
-                if (famosos.error) {
-                    document.getElementById('listaFamosos').innerHTML = `<p style="color:red;">Error cargando archivo: ${famosos.error}</p>`;
-                    return;
-                }
-
-                let html = "<ul style='list-style-type: disc; padding-left: 20px; line-height: 1.8;'>";
-                famosos.forEach(f => {
-                    html += `
-                    <li style="border-bottom: 1px solid #f1f5f9; padding: 5px 0;">
-                        ${f.nombre}, ${f.edad} años - 
-                        <button class="btn-small" style="background-color: var(--primary); color: white; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer;" onclick="verFamoso('${f.nombre}')">"Ver imagen"</button>
-                    </li>`;
-                });
-                html += "</ul>";
-                
-                document.getElementById('listaFamosos').innerHTML = html;
-            } catch(e) {
-                document.getElementById('listaFamosos').innerHTML = `<p style="color:red;">No se pudo conectar con el servidor.</p>`;
-            }
-        }
-
+        // --- PARTE II: Buscador de Imágenes de Famosos ---
         async function verFamoso(nombre) {
             const contenedor = document.getElementById('resultadoFamoso');
             contenedor.innerHTML = "<p><i>Procesando y conectando a la API...</i></p>";
@@ -206,7 +245,6 @@
                         </div>
                     `;
                 } else if (data.error) {
-                    // Control limpio para cuando Wikipedia no tiene la imagen
                     contenedor.innerHTML = `
                         <div style="text-align:center; width: 100%;">
                             <h4 style="margin:0 0 10px 0; color: #1e293b;">Datos de: ${data.nombre || nombre}</h4>
@@ -226,32 +264,17 @@
             }
         }
 
-        // --- PARTE III: Mapa ---
-        const map = L.map('mapa').setView([20, 0], 2);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
-
-        fetch('/api/lugares')
-            .then(res => res.json())
-            .then(data => {
-                if(data.error) {
-                    const errBox = document.getElementById('errorMapa');
-                    errBox.style.display = 'block';
-                    errBox.innerHTML = `<b>Error leyendo coordenadas:</b> ${data.error}`;
-                    return;
+        // --- PARTE III: Función de vuelo para el Mapa ---
+        function irAlLugar(lat, lng, nombre) {
+            // Vuelo dinámico al punto seleccionado
+            map.flyTo([lat, lng], 15, { duration: 2.5 });
+            
+            setTimeout(() => {
+                if(marcadores[nombre]) {
+                    marcadores[nombre].openPopup();
                 }
-                
-                if(Array.isArray(data)) {
-                    data.forEach(lugar => {
-                        L.marker([lugar.lat, lugar.lng]).addTo(map)
-                         .bindPopup(`<b>${lugar.nombre}</b><br><span style="font-size:11px;">${lugar.direccion}</span>`);
-                    });
-                }
-            })
-            .catch(err => console.error("Error en el mapa:", err));
-
-        // Inicialización
-        actualizarTableros();
-        cargarListaFamosos();
+            }, 2500); 
+        }
     </script>
 </body>
 </html>
