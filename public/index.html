@@ -34,7 +34,6 @@
         #mapa { height: 500px; width: 100%; border-radius: 12px; z-index: 1; border: 1px solid var(--border-color);}
         .alerta-info { color: #0369a1; background: #e0f2fe; padding: 15px; border-radius: 6px; border: 1px solid #7dd3fc; text-align: center; font-size: 14px;}
         .buscador-caja { background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 20px; }
-        .sugerencia-link { color: var(--primary); text-decoration: underline; cursor: pointer; font-weight: 600; }
     </style>
 </head>
 <body>
@@ -48,19 +47,16 @@
             <h3>I. Transformación y Almacenamiento Dinámico</h3>
             
             <div class="buscador-caja">
-                <h4 style="margin: 0 0 10px 0;">Menú de Búsqueda Individual</h4>
-                <p style="font-size: 13px; color: var(--text-muted); margin-top:0;">Escriba una comuna (ej. "florida") para agregarla directamente a la tabla.</p>
-                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-                    <input type="text" id="buscadorInput" placeholder="Escriba el nombre de la comuna..." oninput="buscarSugerencias()" style="flex: 1; margin-bottom: 0;">
-                    <button onclick="procesarComunaIndividual()">Procesar Comuna</button>
-                </div>
-                <p style="font-size: 13px; margin: 0;"><b>Sugerencias:</b> <span id="sugerenciasBox" style="color: var(--text-muted);">Ninguna</span></p>
+                <h4 style="margin: 0 0 10px 0;">Menú de Búsqueda de Comuna</h4>
+                <p style="font-size: 13px; color: var(--text-muted); margin-top:0;">Pruebe escribiendo "florida" para ver las opciones generadas.</p>
+                <input type="text" id="buscadorInput" placeholder="Escriba el nombre de la comuna..." oninput="buscarSugerencias()">
+                <p style="font-size: 13px; margin: 0;"><b>Sugerencias:</b> <span id="sugerenciasBox" style="color: var(--primary);">Ninguna</span></p>
             </div>
 
-            <p style="font-size: 14px; color: var(--text-muted);">O cargue un archivo CSV o TXT para el procesamiento masivo.</p>
+            <p style="font-size: 14px; color: var(--text-muted);">Cargue un archivo CSV o TXT para el procesamiento masivo.</p>
             <input type="file" id="archivoComunas" accept=".csv, .txt">
             <button onclick="subirArchivo()">Procesar Archivo Masivo</button>
-            <p><strong>Estado:</strong> <span id="estadoArchivo" style="color: var(--primary);">Esperando archivo/comuna...</span></p>
+            <p><strong>Estado:</strong> <span id="estadoArchivo" style="color: var(--primary);">Esperando archivo...</span></p>
 
             <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-top: 20px;">
                 <div style="flex: 2; min-width: 300px;">
@@ -125,63 +121,26 @@
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
         marcadoresCargados = L.layerGroup().addTo(map);
 
-        // BUSCADOR INTELIGENTE: Pide los datos a Python y los vuelve botones clickeables
+        // NUEVO: Función para mostrar opciones al teclear "florida"
         async function buscarSugerencias() {
             const input = document.getElementById('buscadorInput').value;
             if(input.length < 2) {
-                document.getElementById('sugerenciasBox').innerHTML = "Ninguna";
+                document.getElementById('sugerenciasBox').innerText = "Ninguna";
                 return;
             }
             try {
                 const res = await fetch(`/api/sugerencias?q=${input}`);
-                if (!res.ok) throw new Error("Servidor no responde");
-                
                 const data = await res.json();
                 if(data.length > 0) {
-                    document.getElementById('sugerenciasBox').innerHTML = data.map(c => 
-                        `<span class="sugerencia-link" onclick="autocompletar('${c}')">${c}</span>`
-                    ).join(" o ");
+                    document.getElementById('sugerenciasBox').innerText = data.join(" o ");
                 } else {
-                    document.getElementById('sugerenciasBox').innerHTML = "Sin sugerencias";
+                    document.getElementById('sugerenciasBox').innerText = "Sin sugerencias";
                 }
             } catch (e) {
-                document.getElementById('sugerenciasBox').innerHTML = "<span style='color:red;'>Conectando... (Asegúrate de haber subido tu archivo api/index.py a Vercel)</span>";
+                console.error("Error obteniendo sugerencias");
             }
         }
 
-        // Función auxiliar para rellenar la caja al hacer clic en la sugerencia
-        function autocompletar(texto) {
-            document.getElementById('buscadorInput').value = texto;
-            document.getElementById('sugerenciasBox').innerHTML = "Ninguna";
-        }
-
-        // PROCESAR COMUNA INDIVIDUAL (Convierte el texto en un archivo falso para el backend)
-        async function procesarComunaIndividual() {
-            const input = document.getElementById('buscadorInput').value;
-            if(!input) return alert("Escriba el nombre de una comuna primero.");
-
-            document.getElementById('estadoArchivo').innerText = "Procesando comuna individual...";
-
-            // Truco maestro: Creamos un archivo de texto virtual (Blob)
-            const blob = new Blob([input], { type: 'text/plain' });
-            const file = new File([blob], "comuna_individual.txt", { type: 'text/plain' });
-
-            const formData = new FormData();
-            formData.append("archivo", file);
-
-            try {
-                const res = await fetch('/api/procesar_archivo', { method: 'POST', body: formData });
-                const data = await res.json();
-                document.getElementById('estadoArchivo').innerText = "Comuna procesada y añadida a la tabla con éxito.";
-                actualizarTableros(data);
-                document.getElementById('buscadorInput').value = ""; // Limpiar caja
-                document.getElementById('sugerenciasBox').innerHTML = "Ninguna";
-            } catch(e) {
-                document.getElementById('estadoArchivo').innerText = "Error procesando la comuna.";
-            }
-        }
-
-        // PROCESAR ARCHIVO MASIVO
         async function subirArchivo() {
             const inputArchivo = document.getElementById('archivoComunas');
             if (inputArchivo.files.length === 0) return alert("Seleccione un archivo primero.");
@@ -220,6 +179,7 @@
                 document.getElementById('tablaFinal').innerHTML = htmlTbody;
             }
 
+            // NUEVO: 7 Columnas de Auditoría inyectadas
             const log = data.log;
             document.getElementById('tablaAuditoria').innerHTML = `
                 <tr>
