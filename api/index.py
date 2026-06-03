@@ -15,22 +15,47 @@ auditoria_log = {"fecha_ejecucion": "", "leidos": 0, "procesados": 0, "duplicado
 tabla_final_dinamica = {"columnas": [], "filas": []}
 cache_imagenes = {}
 
-def obtener_datos_lugar(nombre):
-    comunas_reales = {
-        "Florida": ("Biobío", "10.624"),
-        "La Florida": ("Metropolitana", "366.916"),
-        "Concepción": ("Biobío", "223.574"),
-        "Concepcion": ("Biobío", "223.574"),
-        "Talcahuano": ("Biobío", "151.722"),
-        "Penco": ("Biobío", "47.367") 
-    }
-    if nombre in comunas_reales:
-        return comunas_reales[nombre]
-        
-    random.seed(nombre)
-    regiones = ["Valparaíso", "Metropolitana", "Araucanía", "Los Lagos", "Tarapacá", "Coquimbo"]
-    return random.choice(regiones), f"{random.randint(15000, 900000):,}".replace(',', '.')
+# --- Variables globales ---
+auditoria_log = {"fecha_ejecucion": "", "leidos": 0, "procesados": 0, "duplicados_eliminados": 0, "consolidados": 0, "no_encontrados": 0, "errores": 0}
+tabla_final_dinamica = {"columnas": [], "filas": []}
+cache_imagenes = {}
+cache_dpa_chile = {} # NUEVO: Caché para la API del Gobierno
 
+def obtener_datos_lugar(nombre):
+    global cache_dpa_chile
+    
+    # 1. Conexión a la API Institucional del Gobierno de Chile (DPA)
+    # Lo hacemos una sola vez y guardamos en caché para que Vercel procese rápido los 10.000 datos
+    if not cache_dpa_chile:
+        try:
+            url_api_gobierno = "https://apis.digital.gob.cl/dpa/comunas"
+            headers = {'User-Agent': 'ProyectoInacap2026/1.0'}
+            respuesta = requests.get(url_api_gobierno, headers=headers, timeout=10).json()
+            
+            # Guardamos todas las comunas de Chile y sus regiones reales
+            for comuna in respuesta:
+                nombre_api = comuna['nombre'].strip().title()
+                region_api = comuna['nombre_region'].strip()
+                cache_dpa_chile[nombre_api] = region_api
+        except Exception as e:
+            print(f"Error cargando API DPA: {e}")
+            
+    # 2. Normalizamos el nombre ingresado
+    nombre_buscar = nombre.strip().title()
+    
+    # 3. Buscar la región real en los datos de la API del Gobierno
+    if nombre_buscar in cache_dpa_chile:
+        region_real = cache_dpa_chile[nombre_buscar]
+        
+        # Como la API territorial no entrega cantidad de habitantes, simulamos el censo 
+        # de forma matemática para que una comuna siempre mantenga el mismo número
+        random.seed(nombre_buscar)
+        habitantes = f"{random.randint(5000, 450000):,}".replace(',', '.')
+        
+        return region_real, habitantes
+        
+    # Si de verdad no existe (ej. un error de tipeo en el archivo original como "Arauoc")
+    return "Región Desconocida", "No registrado"
 # NUEVO: Ruta para sugerencias de búsqueda
 @app.route('/api/sugerencias', methods=['GET'])
 def sugerencias():
