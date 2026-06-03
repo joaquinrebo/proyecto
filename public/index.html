@@ -9,10 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     
     <style>
-        :root {
-            --primary: #2563eb; --primary-hover: #1d4ed8; --bg-color: #f8fafc;
-            --card-bg: #ffffff; --text-main: #1e293b; --text-muted: #64748b; --border-color: #e2e8f0;
-        }
+        :root { --primary: #2563eb; --primary-hover: #1d4ed8; --bg-color: #f8fafc; --card-bg: #ffffff; --text-main: #1e293b; --text-muted: #64748b; --border-color: #e2e8f0; }
         body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); color: var(--text-main); margin: 0; padding: 20px; }
         .container { max-width: 1200px; margin: auto; }
         .header { text-align: center; margin-bottom: 40px; }
@@ -20,22 +17,23 @@
         .header p { color: var(--text-muted); margin-top: 0; }
         .card { background: var(--card-bg); border-radius: 12px; padding: 25px; margin-bottom: 30px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid var(--border-color); }
         h3 { margin-top: 0; border-bottom: 2px solid var(--bg-color); padding-bottom: 10px; }
-        input[type="file"] { padding: 10px; border: 1px dashed var(--primary); border-radius: 8px; width: 100%; box-sizing: border-box; margin-bottom: 15px;}
+        input[type="file"], input[type="text"] { padding: 10px; border: 1px dashed var(--primary); border-radius: 8px; width: 100%; box-sizing: border-box; margin-bottom: 15px;}
+        input[type="text"] { border: 1px solid #cbd5e1; }
         button { background-color: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
         button:hover { background-color: var(--primary-hover); }
         .btn-descarga { background-color: #10b981; margin-top: 15px; width: 100%; }
         .btn-descarga:hover { background-color: #059669; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 14px; }
-        th, td { padding: 12px; border-bottom: 1px solid var(--border-color); text-align: left; }
-        th { background-color: var(--bg-color); font-weight: 600; color: var(--text-muted); text-transform: uppercase; font-size: 12px;}
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; }
+        th, td { padding: 10px; border-bottom: 1px solid var(--border-color); text-align: left; }
+        th { background-color: var(--bg-color); font-weight: 600; color: var(--text-muted); text-transform: uppercase; font-size: 11px;}
         .layout-famosos { display: flex; gap: 20px; flex-wrap: wrap; }
         .col-lista { flex: 1; min-width: 300px; max-height: 400px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; background: #fafafa;}
         .col-imagen { flex: 1; min-width: 300px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--bg-color); border-radius: 8px; border: 1px dashed #cbd5e1; padding: 20px; text-align: center;}
         .famoso-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #f1f5f9; background: white;}
-        .famoso-item:last-child { border-bottom: none; }
         .btn-small { padding: 5px 10px; font-size: 12px; }
         #mapa { height: 500px; width: 100%; border-radius: 12px; z-index: 1; border: 1px solid var(--border-color);}
         .alerta-info { color: #0369a1; background: #e0f2fe; padding: 15px; border-radius: 6px; border: 1px solid #7dd3fc; text-align: center; font-size: 14px;}
+        .buscador-caja { background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 20px; }
     </style>
 </head>
 <body>
@@ -47,18 +45,28 @@
 
         <div class="card">
             <h3>I. Transformación y Almacenamiento Dinámico</h3>
-            <p style="font-size: 14px; color: var(--text-muted);">Cargue un archivo CSV o TXT. El sistema detectará automáticamente si son Comunas/Lugares o Famosos y ajustará la tabla con datos reales.</p>
             
+            <div class="buscador-caja">
+                <h4 style="margin: 0 0 10px 0;">Menú de Búsqueda de Comuna</h4>
+                <p style="font-size: 13px; color: var(--text-muted); margin-top:0;">Pruebe escribiendo "florida" para ver las opciones generadas.</p>
+                <input type="text" id="buscadorInput" placeholder="Escriba el nombre de la comuna..." oninput="buscarSugerencias()">
+                <p style="font-size: 13px; margin: 0;"><b>Sugerencias:</b> <span id="sugerenciasBox" style="color: var(--primary);">Ninguna</span></p>
+            </div>
+
+            <p style="font-size: 14px; color: var(--text-muted);">Cargue un archivo CSV o TXT para el procesamiento masivo.</p>
             <input type="file" id="archivoComunas" accept=".csv, .txt">
             <button onclick="subirArchivo()">Procesar Archivo Masivo</button>
             <p><strong>Estado:</strong> <span id="estadoArchivo" style="color: var(--primary);">Esperando archivo...</span></p>
 
             <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-top: 20px;">
-                <div style="flex: 1; min-width: 300px;">
+                <div style="flex: 2; min-width: 300px;">
                     <h4 style="margin-bottom: 5px;">Auditoría de Ejecución</h4>
                     <table>
                         <thead>
-                            <tr><th>Fecha/Hora</th><th>Leídos</th><th>Procesados</th><th>Duplicados</th><th>Consolidados</th></tr>
+                            <tr>
+                                <th>Fecha/Hora</th><th>Leídos</th><th>Procesados</th>
+                                <th>Duplicados</th><th>Consolidados</th><th>No Encontrados</th><th>Errores</th>
+                            </tr>
                         </thead>
                         <tbody id="tablaAuditoria"></tbody>
                     </table>
@@ -73,7 +81,7 @@
                             <tbody id="tablaFinal"></tbody>
                         </table>
                     </div>
-                    <button class="btn-descarga" onclick="descargarDatos()">⬇️ Descargar Datos Limpios (CSV)</button>
+                    <button class="btn-descarga" onclick="descargarDatos()">⬇️ Descargar Datos Limpios</button>
                 </div>
             </div>
         </div>
@@ -106,16 +114,33 @@
     </div>
 
     <script>
-        // Capa global para limpiar el mapa fácilmente
         let marcadoresCargados; 
         let marcadores = {}; 
 
-        // Configuración inicial del Mapa (Arranca vacío)
         const map = L.map('mapa').setView([20, 0], 2);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
         marcadoresCargados = L.layerGroup().addTo(map);
 
-        // --- PARTE I: Procesador Inteligente ---
+        // NUEVO: Función para mostrar opciones al teclear "florida"
+        async function buscarSugerencias() {
+            const input = document.getElementById('buscadorInput').value;
+            if(input.length < 2) {
+                document.getElementById('sugerenciasBox').innerText = "Ninguna";
+                return;
+            }
+            try {
+                const res = await fetch(`/api/sugerencias?q=${input}`);
+                const data = await res.json();
+                if(data.length > 0) {
+                    document.getElementById('sugerenciasBox').innerText = data.join(" o ");
+                } else {
+                    document.getElementById('sugerenciasBox').innerText = "Sin sugerencias";
+                }
+            } catch (e) {
+                console.error("Error obteniendo sugerencias");
+            }
+        }
+
         async function subirArchivo() {
             const inputArchivo = document.getElementById('archivoComunas');
             if (inputArchivo.files.length === 0) return alert("Seleccione un archivo primero.");
@@ -128,8 +153,6 @@
                 const res = await fetch('/api/procesar_archivo', { method: 'POST', body: formData });
                 const data = await res.json();
                 document.getElementById('estadoArchivo').innerText = data.mensaje || data.error;
-                
-                // Enviamos los datos directamente a construir el dashboard
                 actualizarTableros(data);
             } catch(e) {
                 document.getElementById('estadoArchivo').innerText = "Error de conexión procesando el archivo.";
@@ -139,7 +162,6 @@
         function actualizarTableros(data) {
             if(!data || !data.tabla) return;
             
-            // 1. Llenar Tabla Principal y Auditoría
             if(data.tabla.columnas) {
                 let htmlThead = "<tr>";
                 data.tabla.columnas.forEach(col => { htmlThead += `<th>${col}</th>`; });
@@ -157,15 +179,16 @@
                 document.getElementById('tablaFinal').innerHTML = htmlTbody;
             }
 
+            // NUEVO: 7 Columnas de Auditoría inyectadas
             const log = data.log;
             document.getElementById('tablaAuditoria').innerHTML = `
                 <tr>
                     <td>${log.fecha_ejecucion || '-'}</td><td>${log.leidos}</td><td>${log.procesados}</td>
                     <td style="color:red;">${log.duplicados_eliminados}</td><td style="color:green;">${log.consolidados}</td>
+                    <td style="color:orange;">${log.no_encontrados}</td><td style="color:red;">${log.errores}</td>
                 </tr>
             `;
 
-            // 2. ACTIVACIÓN CONDICIONAL: Solo si procesó Famosos
             if(data.tabla.columnas.includes("Edad Aprox.")) {
                 let htmlFamosos = "<ul style='list-style-type: disc; padding-left: 20px; line-height: 1.8; background: white; padding-right: 15px; border-radius: 6px;'>";
                 data.tabla.filas.forEach(fila => {
@@ -180,9 +203,8 @@
                 document.getElementById('resultadoFamoso').innerHTML = "<p style='color: var(--text-muted);'>Seleccione un famoso de la lista<br>para visualizar su ficha y fotografía.</p>";
             }
 
-            // 3. ACTIVACIÓN CONDICIONAL: Solo si procesó Lugares Históricos
             if(data.tabla.columnas.includes("Coordenadas")) {
-                marcadoresCargados.clearLayers(); // Limpiamos pines viejos si sube otro archivo
+                marcadoresCargados.clearLayers(); 
                 marcadores = {}; 
                 let htmlLugares = "";
 
@@ -191,20 +213,17 @@
                     let pais = fila[1];
                     let coordsCrudas = fila[2];
                     
-                    // Separamos el string de coordenadas "lat, lng" que viene de Python
                     let arrCoords = coordsCrudas.split(',');
                     if(arrCoords.length === 2) {
                         let lat = parseFloat(arrCoords[0].trim());
                         let lng = parseFloat(arrCoords[1].trim());
 
                         if(!isNaN(lat) && !isNaN(lng)) {
-                            // Crear el pin en el mapa
                             const marker = L.marker([lat, lng]).addTo(marcadoresCargados)
                              .bindPopup(`<b>${nombre}</b><br><span style="font-size:11px;">${pais}</span>`);
                             
                             marcadores[nombre] = marker;
 
-                            // Crear el botón en la lista
                             htmlLugares += `
                             <div class="famoso-item">
                                 <div><strong>${nombre}</strong></div>
@@ -221,7 +240,6 @@
             window.location.href = '/api/descargar_comunas';
         }
 
-        // --- PARTE II: Buscador de Imágenes de Famosos ---
         async function verFamoso(nombre) {
             const contenedor = document.getElementById('resultadoFamoso');
             contenedor.innerHTML = "<p><i>Procesando y conectando a la API...</i></p>";
@@ -264,11 +282,8 @@
             }
         }
 
-        // --- PARTE III: Función de vuelo para el Mapa ---
         function irAlLugar(lat, lng, nombre) {
-            // Vuelo dinámico al punto seleccionado
             map.flyTo([lat, lng], 15, { duration: 2.5 });
-            
             setTimeout(() => {
                 if(marcadores[nombre]) {
                     marcadores[nombre].openPopup();
